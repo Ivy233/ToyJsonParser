@@ -22,7 +22,8 @@ private:
     {
         skip_ws();
         if (buffer.substr(pos, strlen(_expect)) != _expect)
-            Error::expect_error(thisline(), line, pos - last_line, _expect);
+            Error::expect_error(buffer.substr(pos, buffer.find('\n', pos) - pos).c_str(),
+                                line, pos - last_line, _expect);
         pos += strlen(_expect);
     }
     void skip_ws()
@@ -37,63 +38,43 @@ private:
                 break;
         }
     }
-    const char *thisline()
-    {
-        size_t pos_n = buffer.find('\n', pos);
-        return buffer.substr(last_line, pos_n - last_line).c_str();
-    }
 
 private:
-    // Value get_string()
-    // {
-    //     expect("\"");
-    //     std::string val;
-    //     for (char c = buffer[pos]; c != '\"'; c = buffer[++pos])
-    //     {
-    //         if (c != '\\')
-    //             val += c;
-    //         else
-    //             switch (buffer[++pos])
-    //             {
-    //             case '\"':
-    //             case '\\':
-    //             case '/':
-    //                 val += buffer[pos];
-    //                 break;
-    //             case 'b':
-    //                 val += '\b';
-    //                 break;
-    //             case 'f':
-    //                 val += '\f';
-    //                 break;
-    //             case 'n':
-    //                 val += '\n';
-    //                 break;
-    //             case 'r':
-    //                 val += '\r';
-    //                 break;
-    //             case 't':
-    //                 val += '\t';
-    //                 break;
-    //             case 'u':
-    //                 val += '\\u';
-    //                 for (int i = 0; i < 4; i++)
-    //                 {
-    //                     c = buffer[pos + i];
-    //                     if (isdigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))
-    //                         val += c;
-    //                     else
-    //                         Error::string_error(thisline(), line, pos);
-    //                 }
-    //                 pos += 4;
-    //                 break;
-    //             default:
-    //                 Error::string_error(thisline(), line, pos);
-    //             }
-    //     }
-    //     pos++;
-    //     return Value(val);
-    // }
+    Value get_string()
+    {
+        expect("\"");
+        std::string val;
+        val.reserve(1024);
+        for (char c = buffer[pos]; c != '\"'; c = buffer[++pos])
+        {
+            val += c;
+            if (c == '\\')
+            {
+                c = buffer[++pos];
+                if (c == '\"' || c == '\\' || c == '/' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't')
+                    val += c;
+                else if (c == 'u')
+                {
+                    val += 'u';
+                    for (size_t i = 0; i < 4; i++)
+                    {
+                        c = buffer[pos + i];
+                        if (isdigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))
+                            val += c;
+                        else
+                            Error::string_error(buffer.substr(pos, buffer.find('\n', pos) - pos).c_str(),
+                                                line, pos);
+                        pos += 4;
+                    }
+                }
+                else
+                    Error::string_error(buffer.substr(pos, buffer.find('\n', pos) - pos).c_str(),
+                                        line, pos);
+            }
+        }
+        pos++;
+        return Value(val);
+    }
     Value get_number()
     {
         double _d_val;
@@ -121,13 +102,14 @@ private:
         case 'n':
             expect("null");
             return Value();
-        // case '\"':
-        //     return std::move(get_string());
+        case '\"':
+            return std::move(get_string());
         default:
             if (nexttoken == '-' || isdigit(nexttoken))
                 return std::move(get_number());
         }
-        Error::cannot_parse_error(thisline(), line, pos - last_line);
+        Error::cannot_parse_error(buffer.substr(pos, buffer.find('\n', pos) - pos).c_str(),
+                                  line, pos - last_line);
         skip_ws();
         return Value();
     }
