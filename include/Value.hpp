@@ -1,186 +1,96 @@
 #ifndef _VALUE_HPP_
 #define _VALUE_HPP_
 #include "Error.hpp"
-#include <map>
 #include <string>
-#include <vector>
 namespace ToyJson
 {
+using std::enable_if;
+using std::is_floating_point;
+using std::is_integral;
+using std::is_same;
 class Value
 {
 private:
-    using std::map;
-    using std::string;
-    using std::vector;
-    union {
-        map<string, Value> *_M_obj;
-        vector<Value> *_M_vec;
-        string *_M_str;
-        double _M_num;
-        unsigned long long _M_int;
-        bool _M_bool;
-    } _M_val;
     json_t _M_type;
-
-private:
-    void clear()
-    {
-        switch (_M_type)
-        {
-        case _T_Object:
-            delete _M_val._M_obj;
-            break;
-        case _T_Array:
-            delete _M_val._M_vec;
-            break;
-        case _T_String:
-            delete _M_val._M_str;
-            break;
-        default:;
-        }
-        _M_type = _T_Null;
-    }
+    union backup_value {
+        backup_value(double _decimal) : _M_decimal(_decimal) {}
+        backup_value(long long _integer) : _M_integer(_integer) {}
+        backup_value(bool _bool) : _M_bool(_bool) {}
+        backup_value() : _M_integer(0) {}
+        bool _M_bool;
+        long long _M_integer;
+        double _M_decimal;
+    } _M_val;
 
 public:
-    Value() { _M_val._M_obj = nullptr; }
-    Value(const Value &other)
+    Value() : _M_type(_T_Null) {}
+    Value(const Value &rhs)
     {
-        switch (other._M_type)
-        {
-        case _T_Object:
-            _M_val._M_obj =
-                new map<string, Value>(other._M_val._M_obj->begin(),
-                                       other._M_val._M_obj->end());
-            break;
-        case _T_Array:
-            _M_val._M_vec =
-                new vector<Value>(other._M_val._M_vec->begin(),
-                                  other._M_val._M_vec->end());
-            break;
-        case _T_String:
-            _M_val._M_str =
-                new string(*other._M_val._M_str);
-        default:
-            _M_val = other._M_val;
-        }
-        _M_type = other._M_type;
+        _M_type = rhs._M_type;
+        _M_val = rhs._M_val;
     }
-    Value(Value &&other) : _M_val(other._M_val), _M_type(other._M_type)
-    {
-        other._M_type = _T_Null;
-        other._M_val._M_obj = nullptr;
-    }
-
     Value &operator=(const Value &rhs)
     {
         clear();
-        switch (other._M_type)
-        {
-        case _T_Object:
-            _M_val._M_obj =
-                new map<string, Value>(other._M_val._M_obj->begin(),
-                                       other._M_val._M_obj->end());
-            break;
-        case _T_Array:
-            _M_val._M_vec =
-                new vector<Value>(other._M_val._M_vec->begin(),
-                                  other._M_val._M_vec->end());
-            break;
-        case _T_String:
-            _M_val._M_str =
-                new string(*rhs._M_val._M_str);
-        default:
-            _M_val = other._M_val;
-        }
-        _M_type = other._M_type;
+        _M_type = rhs._M_type;
+        _M_val = rhs._M_val;
         return *this;
+    }
+    Value(Value &&rhs) : _M_type(rhs._M_type), _M_val(rhs._M_val)
+    {
+        rhs._M_type = _T_Null;
+        rhs._M_val._M_integer = 0;
     }
     Value &operator=(Value &&rhs)
     {
         clear();
-        _M_val = rhs._M_val;
         _M_type = rhs._M_type;
-        rhs._M_val._M_obj = nullptr;
+        _M_val = rhs._M_val;
         rhs._M_type = _T_Null;
+        rhs._M_val._M_integer = 0;
+        return *this;
     }
-    ~Value()
-    {
-        switch (_M_type)
-        {
-        case _T_Object:
-            delete _M_val._M_obj;
-            break;
-        case _T_Array:
-            delete _M_val._M_vec;
-            break;
-        case _T_String:
-            delete _M_val._M_str;
-            break;
-        default:;
-        }
-    }
+    template <typename T>
+    explicit Value(T _bool, typename enable_if<is_same<T, bool>::value>::type * = 0)
+        : _M_type(_T_Boolean), _M_val((bool)_bool) {}
+    template <typename T>
+    explicit Value(T _integer, typename enable_if<is_integral<T>::value && !is_same<T, bool>::value>::type * = 0)
+        : _M_type(_T_Integer), _M_val((long long)_integer) {}
+    template <typename T>
+    explicit Value(T _decimal, typename enable_if<is_floating_point<T>::value>::type * = 0)
+        : _M_type(_T_Decimal), _M_val((double)_decimal) {}
 
 public:
-    Value &operator[](const string &_key)
-    {
-        if (_M_type != _T_Object)
-            Error::check_type(_M_type, _T_Object);
-        return _M_val._M_obj->operator[](_key);
-    }
-    Value &operator[](size_t _pos)
-    {
-        if (_pos >= _M_val._M_vec->size())
-            Error::border_error(_pos, _M_val._M_vec->size());
-        return _M_val._M_vec->operator[](_pos);
-    }
-    size_t size() const
-    {
-        switch (_M_type)
-        {
-        case _T_Object:
-            return _M_val._M_obj->size();
-        case _T_Array:
-            return _M_val._M_vec->size();
-        case _T_String:
-            return _M_val._M_str->size();
-        default:
-            Error::type_error(_M_type, _T_Object);
-        }
-    }
     json_t type() const { return _M_type; }
-    double double_value() const
-    {
-        if (_M_type != _T_Number)
-            Error::type_error(_M_type, _T_Number);
-        return _M_val._M_num;
-    }
-    bool bool_value() const
-    {
-        if (_M_type != _T_Boolean)
-            Error::type_error(_M_type, _T_Boolean);
-        return _M_val._M_bool;
-    }
-    unsigned long long integer_value() const
-    {
-        if (_M_type != _T_Integer)
-            Error::type_error(_M_type, _T_Integer);
-        return _M_val._M_int;
-    }
-    const string &string_value() const
-    {
-        if (_M_type != _T_String)
-            Error::type_error(_M_type, _T_String);
-        return _M_val._M_str;
-    }
-    bool is_null() const { return _M_type == _T_Null; }
+    bool bool_value() const { return _M_val._M_bool; }
+    long long integer_value() const { return _M_val._M_integer; }
+    double decimal_value() const { return _M_val._M_decimal; }
 
 public:
-    void set(const vector<Value> &_other)
+    void clear()
     {
-        clear();
-        _M_type = _T_Array;
-        _M_val._M_vec = new vector<Value>(_other.begin(), _other.end());
+        _M_type = _T_Null;
+        _M_val._M_integer = 0;
     }
 };
+std::ostream &operator<<(std::ostream &os, const Value &v)
+{
+    switch (v.type())
+    {
+    case _T_Null:
+        os << "null";
+        break;
+    case _T_Boolean:
+        os << (v.bool_value() ? "true" : "false");
+        break;
+    case _T_Integer:
+        os << v.integer_value();
+    case _T_Decimal:
+        os << v.decimal_value();
+    default:
+        break;
+    }
+    return os;
+}
 }; // namespace ToyJson
 #endif

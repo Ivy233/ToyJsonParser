@@ -36,7 +36,7 @@ void expect_error(const char *_thisline, const size_t &_line, const size_t &_pos
 }
 void string_error(const char *_thisline, const size_t &_line, const size_t &_pos)
 {
-    printf("line %lld: no \" to enclosure a string from pos %lld in \"%s\"\n", _line, _pos, _thisline);
+    printf("line %lld: meet an error when parse a string at pos %lld in \"%s\"\n", _line, _pos, _thisline);
     assert(0);
 }
 void cannot_parse_error(const char *_thisline, const size_t &_line, const size_t &_pos)
