@@ -1,14 +1,18 @@
 #ifndef _VALUE_HPP_
 #define _VALUE_HPP_
 #include "Error.hpp"
+#include <map>
 #include <string>
+#include <vector>
 namespace ToyJson
 {
 using std::enable_if;
 using std::is_floating_point;
 using std::is_integral;
 using std::is_same;
+using std::map;
 using std::string;
+using std::vector;
 class Value
 {
 private:
@@ -23,6 +27,8 @@ private:
         long long _M_integer;
         double _M_decimal;
         string *_M_string;
+        vector<Value> *_M_array;
+        map<string, Value> *_M_object;
     } _M_val;
 
 private:
@@ -62,6 +68,32 @@ private:
             }
         return std::move(ret);
     }
+    void print_arr(std::ostream &os) const
+    {
+        os << "[";
+        size_t maxs = _M_val._M_array->size();
+        for (size_t pos = 0; pos < maxs; pos++)
+        {
+            os << _M_val._M_array->operator[](pos);
+            if (pos < maxs - 1)
+                os << ",";
+        }
+        os << "]";
+    }
+    void print_obj(std::ostream &os) const
+    {
+        os << "{";
+        size_t maxs = _M_val._M_object->size();
+        std::map<std::string, Value>::iterator it = _M_val._M_object->begin();
+        for (; it != _M_val._M_object->end(); it++)
+        {
+            os << "\"" << it->first << "\":" << it->second;
+            maxs--;
+            if (maxs > 0)
+                os << ",";
+        }
+        os << "}";
+    }
 
 public:
     Value() : _M_type(_T_Null) {}
@@ -71,6 +103,14 @@ public:
         {
         case _T_String:
             _M_val._M_string = new string(*rhs._M_val._M_string);
+            break;
+        case _T_Array:
+            _M_val._M_array = new vector<Value>(rhs._M_val._M_array->begin(),
+                                                rhs._M_val._M_array->end());
+            break;
+        case _T_Object:
+            _M_val._M_object = new map<string, Value>(rhs._M_val._M_object->begin(),
+                                                      rhs._M_val._M_object->end());
             break;
         default:
             _M_val = rhs._M_val;
@@ -84,6 +124,14 @@ public:
         {
         case _T_String:
             _M_val._M_string = new string(*rhs._M_val._M_string);
+            break;
+        case _T_Array:
+            _M_val._M_array = new vector<Value>(rhs._M_val._M_array->begin(),
+                                                rhs._M_val._M_array->end());
+            break;
+        case _T_Object:
+            _M_val._M_object = new map<string, Value>(rhs._M_val._M_object->begin(),
+                                                      rhs._M_val._M_object->end());
             break;
         default:
             _M_val = rhs._M_val;
@@ -139,41 +187,125 @@ public:
     {
         if (_M_type != _T_String)
             Error::type_error(_M_type, _T_String);
-        return std::move(*_M_val._M_string);
+        return *_M_val._M_string;
+    }
+    size_t size() const
+    {
+        switch (_M_type)
+        {
+        case _T_Array:
+            return _M_val._M_array->size();
+        case _T_Object:
+            return _M_val._M_object->size();
+        default:
+            Error::type_error(_M_type, _T_Object, _T_Array);
+        }
+        return 0;
     }
 
 public:
+    Value &operator[](const string &_key)
+    {
+        if (_M_type != _T_Object)
+            Error::type_error(_M_type, _T_Object);
+        return _M_val._M_object->operator[](_key);
+    }
+    const Value &operator[](const string &_key) const
+    {
+        if (_M_type != _T_Object)
+            Error::type_error(_M_type, _T_Object);
+        map<string, Value>::iterator it = _M_val._M_object->find(_key);
+        if (it != _M_val._M_object->end())
+            Error::cannot_find_error(_key.c_str());
+        return _M_val._M_object->operator[](_key);
+    }
+    Value &operator[](size_t _key)
+    {
+        if (_M_type != _T_Array)
+            Error::type_error(_M_type, _T_Array);
+        size_t max_cnt = _M_val._M_array->size();
+        if (_key > max_cnt)
+            Error::border_error(_key, _M_val._M_array->size());
+        else if (_key == max_cnt)
+            _M_val._M_array->push_back(Value());
+        return _M_val._M_array->operator[](_key);
+    }
+    const Value &operator[](size_t _key) const
+    {
+        if (_M_type != _T_Array)
+            Error::type_error(_M_type, _T_Array);
+        if (_key >= _M_val._M_array->size())
+            Error::border_error(_key, _M_val._M_array->size());
+        return _M_val._M_array->operator[](_key);
+    }
     void clear()
     {
         _M_type = _T_Null;
+        switch (_M_type)
+        {
+        case _T_String:
+            delete _M_val._M_string;
+            break;
+        case _T_Array:
+            delete _M_val._M_array;
+            break;
+        case _T_Object:
+            delete _M_val._M_object;
+            break;
+        default:
+            break;
+        }
         _M_val._M_integer = 0;
     }
-};
-std::ostream &operator<<(std::ostream &os, const Value &v)
-{
-    switch (v.type())
+    void make(json_t _type)
     {
-    case _T_Null:
-        os << "null";
-        break;
-    case _T_Boolean:
-        os << (v.bool_value() ? "true" : "false");
-        break;
-    case _T_Integer:
-        os << v.integer_value();
-        break;
-    case _T_Decimal:
-        os << v.decimal_value();
-        break;
-    case _T_String:
-        os << v.string_value();
-        break;
-    case _T_Object:
-        break;
-    case _T_Array:
-        break;
+        _M_type = _type;
+        switch (_M_type)
+        {
+        case _T_String:
+            _M_val._M_string = new string();
+            break;
+        case _T_Array:
+            _M_val._M_array = new vector<Value>();
+            break;
+        case _T_Object:
+            _M_val._M_object = new map<string, Value>();
+            break;
+        default:
+            _M_val._M_integer = 0;
+        }
     }
-    return os;
-}
+
+public:
+    friend std::ostream &operator<<(std::ostream &os, const Value &v)
+    {
+        switch (v._M_type)
+        {
+        case _T_Null:
+            os << "null";
+            break;
+        case _T_Boolean:
+            os << (v.bool_value() ? "true" : "false");
+            break;
+        case _T_Integer:
+            os << v.integer_value();
+            break;
+        case _T_Decimal:
+            os << v.decimal_value();
+            break;
+        case _T_String:
+            os << "\"" << v.string_value() << "\"";
+            break;
+        case _T_Object:
+            v.print_obj(os);
+            break;
+        case _T_Array:
+            v.print_arr(os);
+            break;
+        }
+        return os;
+    }
+};
+
 }; // namespace ToyJson
 #endif
