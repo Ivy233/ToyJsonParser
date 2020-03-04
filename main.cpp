@@ -47,21 +47,24 @@ int main()
         tmp = a.parse();
         cout << _M_type[tmp.type()] << ": " << tmp.string_value() << endl;
         tmp = Value(12345);
+        // cout << tmp.size() << endl;
         cout << tmp << endl;
     }
     a.open("ToyJson_parser/test/2-array.json");
     {
         tmp = a.parse();
-        cout << tmp << endl;
+        // cout << tmp << endl;
         cout << tmp << endl;
         tmp[2] = Value("\r\n\b\t\f\\");
         cout << tmp << endl;
-        cout << tmp[0] << endl;
+        // cout << tmp["123"] << endl;
     }
     a.open("ToyJson_parser/test/2-object.json");
     {
         tmp = a.parse();
         cout << tmp << endl;
     }
+    Value b = Value("1\t2345");
+    cout << b.string_value() << endl;
     return 0;
 }

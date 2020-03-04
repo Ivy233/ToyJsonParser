@@ -183,7 +183,7 @@ public:
             Error::type_error(_M_type, _T_Decimal);
         return _M_val._M_decimal;
     }
-    string string_value() const
+    const string &string_value() const
     {
         if (_M_type != _T_String)
             Error::type_error(_M_type, _T_String);
