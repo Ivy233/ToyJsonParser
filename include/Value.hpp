@@ -11,8 +11,47 @@ using std::is_floating_point;
 using std::is_integral;
 using std::is_same;
 using std::map;
+using std::move;
 using std::string;
 using std::vector;
+string escape(const string &_string)
+{
+    string ret;
+    ret.reserve(_string.size());
+    for (char c : _string)
+    {
+        switch (c)
+        {
+        case '\\':
+            ret += "\\\\";
+            break;
+        case '\"':
+            ret += "\\\"";
+            break;
+        case '\'':
+            ret += "\\\'";
+            break;
+        case '\n':
+            ret += "\\n";
+            break;
+        case '\b':
+            ret += "\\b";
+            break;
+        case '\f':
+            ret += "\\f";
+            break;
+        case '\r':
+            ret += "\\r";
+            break;
+        case '\t':
+            ret += "\\t";
+            break;
+        default:
+            ret += c;
+        }
+    }
+    return move(ret);
+}
 class Value
 {
 private:
@@ -32,42 +71,6 @@ private:
     } _M_val;
 
 private:
-    string escape(const string &str)
-    {
-        string ret;
-        ret.reserve(str.size());
-        for (size_t i = 0; i < str.size(); i++)
-            switch (str[i])
-            {
-            case '\"':
-                ret.append("\\\"");
-                break;
-            case '\\':
-                ret.append("\\\\");
-                break;
-            case '\b':
-                ret.append("\\b");
-                break;
-            case '\f':
-                ret.append("\\f");
-                break;
-            case '\n':
-                ret.append("\\n");
-                break;
-            case '\r':
-                ret.append("\\r");
-                break;
-            case '\t':
-                ret.append("\\t");
-                break;
-            case '/':
-                ret.append("\\/");
-                break;
-            default:
-                ret += str[i];
-            }
-        return std::move(ret);
-    }
     void print_arr(std::ostream &os) const
     {
         os << "[";
@@ -87,7 +90,7 @@ private:
         std::map<std::string, Value>::iterator it = _M_val._M_object->begin();
         for (; it != _M_val._M_object->end(); it++)
         {
-            os << "\"" << it->first << "\":" << it->second;
+            os << "\"" << escape(it->first) << "\":" << it->second;
             maxs--;
             if (maxs > 0)
                 os << ",";
@@ -161,7 +164,7 @@ public:
     template <typename T>
     explicit Value(T _decimal, typename enable_if<is_floating_point<T>::value>::type * = 0)
         : _M_type(_T_Decimal), _M_val((double)_decimal) {}
-    explicit Value(string _string) : _M_type(_T_String), _M_val(escape(_string)) {}
+    explicit Value(string _string) : _M_type(_T_String), _M_val(_string) {}
 
 public:
     json_t type() const { return _M_type; }
@@ -183,11 +186,11 @@ public:
             Error::type_error(_M_type, _T_Decimal);
         return _M_val._M_decimal;
     }
-    const string &string_value() const
+    string string_value() const
     {
         if (_M_type != _T_String)
             Error::type_error(_M_type, _T_String);
-        return *_M_val._M_string;
+        return escape(*_M_val._M_string);
     }
     size_t size() const
     {

@@ -9,7 +9,7 @@ namespace ToyJson
 class Parser
 {
 private:
-    string buffer, thisline;
+    string buffer;
     size_t line, pos;
 
 private:
@@ -23,77 +23,75 @@ private:
         skip_ws();
         string check_str = buffer.substr(pos, strlen(_expect));
         if (check_str != _expect)
-            Error::expect_error(line, thisline.c_str(), check_str.c_str(), _expect);
+            Error::expect_error(line, escape(buffer.substr(pos, 8)).c_str(), _expect);
         pos += strlen(_expect);
     }
     void skip_ws()
     {
         while (pos < buffer.size())
-        {
             if (buffer[pos] == 0xA)
-            {
                 pos++, line++;
-
-                size_t pos_n = buffer.find('\n', pos);
-                if (pos_n == string::npos)
-                    pos_n = buffer.size();
-                thisline = buffer.substr(pos, pos_n - pos);
-            }
             else if (buffer[pos] == 0x9 || buffer[pos] == 0xD || buffer[pos] == 0x20)
                 pos++;
             else
                 break;
-        }
     }
 
 private:
-    Value get_string()
+    string get_string()
     {
         expect("\"");
-        string val;
-        val.reserve(1024);
-        for (char c = buffer[pos]; c != '\"'; c = buffer[++pos])
+        string ret;
+        ret.reserve(128);
+        while (pos < buffer.size() && buffer[pos] != '\"')
         {
-            val += c;
-            if (c == '\\')
-            {
-                size_t pos_n = pos + 1;
-                c = buffer[pos_n];
-                if (c == '\"' || c == '\\' || c == '/' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't')
-                    val += c;
-                else if (c == 'u')
+            if (buffer[pos] != '\\')
+                ret += buffer[pos];
+            else
+                switch (buffer[++pos])
                 {
-                    val += 'u';
-                    for (size_t i = 0; i < 4; i++)
-                    {
-                        c = buffer[pos_n + i];
-                        if (isdigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))
-                            val += c;
-                        else
-                            Error::slash_error(line, thisline.c_str(), buffer.substr(pos, pos_n - pos).c_str());
-                    }
-                    pos_n += 4;
+                case '\\':
+                    ret += '\\';
+                    break;
+                case '\"':
+                    ret += '\"';
+                    break;
+                case '\'':
+                    ret += '\'';
+                    break;
+                case 'n':
+                    ret += '\n';
+                    break;
+                case 'b':
+                    ret += '\b';
+                    break;
+                case 'f':
+                    ret += '\f';
+                    break;
+                case 'r':
+                    ret += '\r';
+                    break;
+                case 't':
+                    ret += '\t';
+                    break;
+                default:
+                    ret += '\\';
                 }
-                else
-                    Error::slash_error(line, thisline.c_str(), buffer.substr(pos, pos_n - pos).c_str());
-                pos = pos_n;
-            }
+            pos++;
         }
-        pos++;
-        return Value(val);
+        expect("\"");
+        return ret;
     }
     Value get_number()
     {
         double _d_val;
-        size_t pos_n, line_end = buffer.find('\n', pos);
-        string tmp = buffer.substr(pos, line_end - pos);
+        size_t pos_n;
+        string tmp = buffer.substr(pos, buffer.find('\n', pos) - pos);
         _d_val = std::stod(tmp, &pos_n);
         pos += pos_n;
         for (size_t i = 0; i < pos_n; i++)
-        {
             if (tmp[i] == '.' || tmp[i] == 'e' || tmp[i] == 'E')
                 return Value(_d_val);
-        }
         return Value((long long)_d_val);
     }
     Value get_array()
@@ -112,7 +110,7 @@ private:
                 expect(",");
             }
         expect("]");
-        return std::move(ret);
+        return move(ret);
     }
     Value get_object()
     {
@@ -122,16 +120,16 @@ private:
         if (next_token() != '}')
             while (1)
             {
-                Value _key = get_string();
+                string _key = get_string();
                 expect(":");
                 Value _val = get_element();
-                ret[_key.string_value()] = _val;
+                ret[_key] = _val;
                 if (next_token() == '}')
                     break;
                 expect(",");
             }
         expect("}");
-        return std::move(ret);
+        return move(ret);
     }
     Value get_element()
     {
@@ -148,38 +146,48 @@ private:
             expect("null");
             return Value();
         case '\"':
-            return std::move(get_string());
+            return Value(get_string());
         case '[':
-            return std::move(get_array());
+            return move(get_array());
         case '{':
-            return std::move(get_object());
+            return move(get_object());
         default:
             if (nexttoken == '-' || isdigit(nexttoken))
                 return std::move(get_number());
         }
-        Error::cannot_parse_error(line, thisline.c_str(), buffer.substr(pos, 3).c_str());
+        Error::cannot_parse_error(line, escape(buffer.substr(pos, 8)).c_str());
         skip_ws();
         return Value();
     }
 
 public:
-    Parser(const char *filedir) { open(filedir); }
-    void open(const char *filedir)
+    Value parse_string(const char *_string)
+    {
+        buffer = _string;
+        line = 1, pos = 0;
+        return move(get_element());
+    }
+    Value parse_string(const string &_string)
+    {
+        buffer = _string;
+        line = 1, pos = 0;
+        return move(get_element());
+    }
+    Value parse_file(const char *_filedir)
     {
         std::ifstream ifs;
-        ifs.open(filedir);
+        ifs.open(_filedir);
         if (ifs.good())
         {
             std::stringstream ss;
             ss << ifs.rdbuf();
             buffer = ss.str();
             line = 1, pos = 0;
-            thisline = buffer.substr(pos, buffer.find('\n', pos));
         }
         else
-            Error::io_error(filedir);
+            Error::io_error(_filedir);
+        return move(get_element());
     }
-    Value parse() { return std::move(get_element()); }
 };
 }; // namespace ToyJson
 

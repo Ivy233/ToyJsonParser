@@ -35,19 +35,19 @@ void io_error(const char *_filedir)
     assert(0);
 }
 // Parser
-void expect_error(size_t _line, const char *_thisline, const char *_meet, const char *_expect)
+void expect_error(size_t _line, const char *_meet, const char *_expect)
 {
-    printf("line %lld: expect \"%s\", but meet \"%s\" in \"%s\"\n", _line, _expect, _meet, _thisline);
+    printf("line %lld: expect \"%s\", but meet \"%s\"\n", _line, _expect, _meet);
     assert(0);
 }
-void slash_error(size_t _line, const char *_thisline, const char *_meet)
+void slash_error(size_t _line, const char *_meet)
 {
-    printf("line %lld: can parse \"%s\" in \"%s\", but the next char cannot be parsed\n", _line, _meet, _thisline);
+    printf("line %lld: cannot parse \"%s\" while parsing a string\n", _line, _meet);
     assert(0);
 }
-void cannot_parse_error(size_t _line, const char *_thisline, const char *_meet)
+void cannot_parse_error(size_t _line, const char *_meet)
 {
-    printf("line %lld: encounted chars \"%s\" in \"%s\" is not the beginning of a json structure\n", _line, _meet, _thisline);
+    printf("line %lld: encounted chars \"%s\" are not the beginning of a json structure\n", _line, _meet);
     assert(0);
 }
 } // namespace Error
