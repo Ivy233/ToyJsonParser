@@ -164,7 +164,9 @@ public:
     template <typename T>
     explicit Value(T _decimal, typename enable_if<is_floating_point<T>::value>::type * = 0)
         : _M_type(_T_Decimal), _M_val((double)_decimal) {}
-    explicit Value(string _string) : _M_type(_T_String), _M_val(_string) {}
+    explicit Value(const char *_string) : _M_type(_T_String), _M_val(_string) {}
+    explicit Value(const string &_string) : _M_type(_T_String), _M_val(_string) {}
+    explicit Value(string &&_string) : _M_type(_T_String), _M_val(move(_string)) {}
 
 public:
     json_t type() const { return _M_type; }

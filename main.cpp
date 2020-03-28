@@ -36,7 +36,7 @@ void test_1()
     cout << "try to parse string: " << test_val << endl
          << endl;
 
-    test_val = test_parser.parse_string("[1,tru.e,3,4.56,\"string_value\"]");
+    test_val = test_parser.parse_string("[1,true,3,4.56,\"string_value\"]");
     assert(test_val.type() == _T_Array);
     cout << "try to parse an array: " << test_val << endl;
 
@@ -55,25 +55,35 @@ void test_1()
     assert(test_val.type() == _T_Object);
     cout << "try to parse an object: " << test_val << endl
          << test_val["k3"] << endl
+         << test_parser.parse_string("[1,2,3,\"huajihuajihuaji\",true]") << endl
          << endl;
-
-    cout << test_parser.parse_string("[1,2,3,\"huajihuajihuaji\",true]") << endl;
 }
 void test_2()
 {
     // 文件读写测试
-    // 第一个文件即test_1的最后内容
     // ifstream->Value->ofstream
+    Parser test_parser;
+    ofstream fileout;
+    fileout.open("test.json");
+
+    Value test_val = test_parser.parse_file("test/1-object.json");
+    fileout << test_val << endl;
 }
 void test_3()
 {
     // 其他初始化测试
     // 主要是initializer_list的嵌套
-}
-void test_4()
-{
-    // 修改测试
-    // 大坑，待完善
+    // 这一块接口还需要花费时间思考以符合习惯，但是大体都是这类
+    // 如果这样修改的话，可能会修改目前对于数组、obj的处理，即先make然后按次序添加
+    list<int> l1{1, 2, 3};
+    vector<int> l2{1, 2, 3};
+    set<int> l3{1, 2, 3};
+    assert(Value(l1) == Value(l2));
+    assert(Value(l2) == Value(l3));
+
+    map<string, string> m1{{"k1", "v1"}, {"k2", "v2"}};
+    unordered_map<string, string> m2{{"k1", "v1"}, {"k2", "v2"}};
+    assert(Json(m1) == Json(m2));
 }
 int main()
 {
@@ -81,6 +91,5 @@ int main()
     test_1();
     test_2();
     test_3();
-    test_4();
     return 0;
 }
